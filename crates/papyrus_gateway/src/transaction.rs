@@ -379,7 +379,6 @@ pub mod input{
     use crate::api::{BlockId, Tag};
     use crate::state::{ContractClassAbiEntryWithType};
     use crate::transaction::TransactionType;
-    use crate::utils;
     use starknet_api::transaction::{Fee, TransactionVersion, TransactionSignature, ContractAddressSalt, Calldata};
     use starknet_api::core::{Nonce, ClassHash, ContractAddress, EntryPointSelector};
 
@@ -566,7 +565,7 @@ pub mod input{
     impl Into<starknet_client::objects::input::transaction::ContractClass> for ContractClass{
         fn into(self) -> starknet_client::objects::input::transaction::ContractClass {
             let program_value = serde_json::to_value(&self.program).unwrap();
-            let program_value = utils::traverse_and_exclude_top_level_keys(
+            let program_value = starknet_api::utils::traverse_and_exclude_top_level_keys(
                 &program_value, 
                 &|key, val|{
                     return (key == "attributes" || key == "compiler_version") && val.is_null();

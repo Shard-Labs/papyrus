@@ -1,6 +1,5 @@
 mod api;
 mod block;
-mod utils;
 #[cfg(test)]
 mod gateway_test;
 mod state;

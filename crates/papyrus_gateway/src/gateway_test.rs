@@ -16,7 +16,6 @@ use papyrus_storage::header::HeaderStorageWriter;
 use papyrus_storage::state::StateStorageWriter;
 use papyrus_storage::test_utils::get_test_storage;
 use papyrus_storage::{EventIndex, TransactionIndex};
-use serde_json::Value;
 use starknet_api::block::{BlockHash, BlockHeader, BlockNumber, BlockStatus};
 use starknet_api::core::{ClassHash, ContractAddress, Nonce, PatriciaKey};
 use starknet_api::hash::{StarkFelt, StarkHash};
@@ -44,7 +43,7 @@ use crate::transaction::{
     Event, TransactionOutput, TransactionReceipt, TransactionReceiptWithStatus, TransactionStatus,
     TransactionWithType, Transactions,
 };
-use crate::{run_server, ContinuationTokenAsStruct, utils};
+use crate::{run_server, ContinuationTokenAsStruct};
 
 #[tokio::test]
 async fn block_number() {
@@ -1509,83 +1508,6 @@ async fn estimate_fee_deploy_transaction(){
 
     let res = rpc_server.call::<_, FeeEstimate>("starknet_estimateFee", (BlockId::Tag(Tag::Pending), input) ).await.unwrap();
     assert_eq!(res, FeeEstimate::default());
-}
-
-#[tokio::test]
-async fn serde_remove_elements_from_json(){
-    let input = r#"
-        {
-            "name": "John Doe",
-            "isStudent": true,
-            "age":30,
-            "address": {
-                "street": "Vlvo",
-                "city": "Anytown",
-                "state": "Any"
-            },
-            "should_be_removed": [],
-            "scores": 
-            [
-                {
-                    "street": "AAA",
-                    "age": 5,
-                    "should_be_removed": []
-                },
-                {
-                    "age": 5
-                }
-            ],
-            "arr": [90, 85, 95]
-        }
-    "#;
-
-    let expected_output = r#"
-        {
-            "name": "John Doe",
-            "isStudent": true,
-            "age":30,
-            "address": {
-                "street": "Vlvo",
-                "city": "Anytown",
-                "state": "Any"
-            },
-            "scores": 
-            [
-                {
-                    "street": "AAA",
-                    "age": 5
-                },
-                {
-                    "age": 5
-                }
-            ],
-            "arr": [90, 85, 95]
-        }
-    "#;
-    
-    let value: Value = serde_json::from_str(input).unwrap();
-    let mut new_object: serde_json::Map<String, Value> = serde_json::Map::new();
-
-    let res = crate::utils::traverse_and_exclude_recursively(
-        &value, 
-        &mut new_object, 
-        &|key, val| {
-            return key=="should_be_removed" && 
-            val.is_array() && 
-            val.as_array().unwrap().is_empty()
-        });
-
-    assert_eq!(res, serde_json::from_str::<serde_json::Value>(expected_output).unwrap());
-}
-
-#[tokio::test]
-async fn test_contract_class_hash_generation(){
-    let data: serde_json::Value= serde_json::from_str(&std::fs::read_to_string("./resources/contract_compiled.json").unwrap()).unwrap();
-    
-    let expected_class_hash = ClassHash(StarkHash::try_from("0x399998c787e0a063c3ac1d2abac084dcbe09954e3b156d53a8c43a02aa27d35").unwrap());
-
-    let resulted_class_hash = utils::compute_contract_class_hash_v0(&data);
-    assert_eq!(resulted_class_hash, expected_class_hash);
 }
 
 async fn validate_state(state_diff: &StateDiff, server_address: SocketAddr, schema: &JSONSchema) {
