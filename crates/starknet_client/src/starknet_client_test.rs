@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
+use ::test_utils::{get_rng, GetTestInstance};
 use assert_matches::assert_matches;
 use mockito::mock;
 use reqwest::StatusCode;
@@ -18,6 +20,9 @@ use super::{
     Block, ClientError, RetryErrorCode, StarknetClient, StarknetClientTrait, BLOCK_NUMBER_QUERY,
     CLASS_HASH_QUERY, GET_BLOCK_URL, GET_STATE_UPDATE_URL,
 };
+use crate::objects::input::transaction::{CommonTransactionFields, InvokeTransactionV1};
+use crate::objects::output::transaction::AddTransactionResult;
+use crate::test_utils;
 
 #[test]
 fn new_urls() {
@@ -160,15 +165,16 @@ async fn contract_class() {
             ),
         ]),
     };
-    let mock_by_hash =
-        mock(
-            "GET",
-            &format!("/feeder_gateway/get_class_by_hash?\
-         {CLASS_HASH_QUERY}=0x7af612493193c771c1b12f511a8b4d3b0c6d0648242af4680c7cd0d06186f17")[..],
-        )
-        .with_status(200)
-        .with_body(read_resource_file("contract_class.json"))
-        .create();
+    let mock_by_hash = mock(
+        "GET",
+        &format!(
+            "/feeder_gateway/get_class_by_hash?\
+             {CLASS_HASH_QUERY}=0x7af612493193c771c1b12f511a8b4d3b0c6d0648242af4680c7cd0d06186f17"
+        )[..],
+    )
+    .with_status(200)
+    .with_body(read_resource_file("contract_class.json"))
+    .create();
     let contract_class = starknet_client
         .class_by_hash(ClassHash(stark_felt!(
             "0x7af612493193c771c1b12f511a8b4d3b0c6d0648242af4680c7cd0d06186f17"
@@ -250,4 +256,38 @@ async fn retry_error_codes() {
         assert_matches!(error, ClientError::RetryError { code, message: _ } if code == error_code);
         mock.assert();
     }
+}
+
+#[tokio::test]
+async fn test_gateway_add_invoke_tran() {
+    let starknet_client =
+        StarknetClient::new(&mockito::server_url(), None, get_test_config()).unwrap();
+
+    let mut rng = get_rng();
+    let invoke_tran = starknet_api::transaction::InvokeTransaction::get_test_instance(&mut rng);
+    let request = InvokeTransactionV1 {
+        contract_address: invoke_tran.sender_address,
+        calldata: crate::objects::input::transaction::Calldata::from(invoke_tran.calldata),
+        common_fields: CommonTransactionFields {
+            r#type: TransactionType::InvokeFunction,
+            max_fee: invoke_tran.max_fee,
+            version: invoke_tran.version,
+            signature: crate::objects::input::transaction::TransactionSignature::from(
+                invoke_tran.signature,
+            ),
+            nonce: invoke_tran.nonce,
+        },
+    };
+    let tran = crate::objects::input::transaction::Transaction::Invoke(
+        crate::objects::input::transaction::InvokeTransaction::V1(request),
+    );
+    let response_body = r#"{"code": "TRANSACTION_RECEIVED", "transaction_hash": "0x1e18081a12aae41d32decef03e67f6bd1915438d6c995fceaa5064e337c9826"}"#;
+    let mock =
+        mock("POST", "/gateway/add_transaction").with_status(200).with_body(response_body).create();
+
+    let response = starknet_client.add_transaction(tran).await.unwrap().unwrap();
+    let expected_result: AddTransactionResult = serde_json::from_str(response_body).unwrap();
+    mock.assert();
+
+    assert_eq!(response, expected_result)
 }
