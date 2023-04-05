@@ -14,7 +14,7 @@ use std::fmt::{self, Display, Formatter};
 use async_trait::async_trait;
 #[cfg(any(feature = "testing", test))]
 use mockall::automock;
-use objects::output::transaction::FeeEstimate;
+use objects::output::transaction::{FeeEstimate, AddTransactionResult};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -50,8 +50,10 @@ pub trait StarknetClientTrait {
     async fn class_by_hash(&self, class_hash: ClassHash) -> ClientResult<Option<ContractClass>>;
     /// Returns a [`starknet_clinet`][`StateUpdate`] corresponding to `block_number`.
     async fn state_update(&self, block_number: BlockNumber) -> ClientResult<Option<StateUpdate>>;
-    /// 
+    /// Returns a [`starknet_clinet`][`FeeEstimate`] corresponding to given `transaction`.
     async fn simulate_transaction(&self, block_number: objects::input::block::BlockId, request: objects::input::transaction::Transaction) -> ClientResult<Option<FeeEstimate>>;
+    /// Returns a [`starknet_clinet`][`AddTransactionResukt`] containing information about transaction hash and class hash or contract address
+    async fn add_transaction(&self, request: objects::input::transaction::Transaction) -> ClientResult<Option<AddTransactionResult>>;
 }
 
 /// A starknet client.
@@ -68,6 +70,7 @@ struct StarknetUrls {
     get_contract_by_hash: Url,
     get_state_update: Url,
     simulate_transaction: Url,
+    add_transaction: Url,
 }
 
 /// Error codes returned by the starknet gateway.
@@ -174,9 +177,10 @@ pub enum ClientError {
 const GET_BLOCK_URL: &str = "feeder_gateway/get_block";
 const GET_CONTRACT_BY_HASH_URL: &str = "feeder_gateway/get_class_by_hash";
 const GET_STATE_UPDATE_URL: &str = "feeder_gateway/get_state_update";
+const SIMULATE_TRANSACTION: &str = "feeder_gateway/simulate_transaction";
+const ADD_TRANSACTION: &str = "gateway/add_transaction";
 const BLOCK_NUMBER_QUERY: &str = "blockNumber";
 const CLASS_HASH_QUERY: &str = "classHash";
-const SIMULATE_TRANSACTION: &str = "feeder_gateway/simulate_transaction";
 
 impl StarknetUrls {
     fn new(url_str: &str) -> Result<Self, ClientCreationError> {
@@ -186,6 +190,7 @@ impl StarknetUrls {
             get_contract_by_hash: base_url.join(GET_CONTRACT_BY_HASH_URL)?,
             get_state_update: base_url.join(GET_STATE_UPDATE_URL)?,
             simulate_transaction: base_url.join(SIMULATE_TRANSACTION)?,
+            add_transaction: base_url.join(ADD_TRANSACTION)?,
         })
     }
 }
@@ -355,6 +360,37 @@ impl StarknetClientTrait for StarknetClient {
         }
     }
 
+    async fn add_transaction(&self, request: objects::input::transaction::Transaction) -> ClientResult<Option<AddTransactionResult>>{
+        let url = self.urls.add_transaction.clone();
+
+        let result = self.internal_client
+            .post(url)
+            .headers(self.http_headers.clone())
+            .json(&request)
+            .send()
+            .await;
+
+        let (code, message) = match result {
+            Ok(response) => (response.status(), response.text().await?),
+            Err(err) => {
+                let msg = err.to_string();
+                (err.status().ok_or(err)?, msg)
+            }
+        };
+        
+        match code {
+            StatusCode::OK => {
+                let data: AddTransactionResult = serde_json::from_str(&message)?;
+                return Ok(Some(data));
+            },
+            StatusCode::INTERNAL_SERVER_ERROR => {
+                let starknet_error: StarknetError = serde_json::from_str(&message)?;
+                Err(ClientError::StarknetError(starknet_error))
+            }
+            _ => Err(ClientError::BadResponseStatus { code, message }),
+        }
+    }
+
     async fn simulate_transaction(&self, block_number: objects::input::block::BlockId, request: objects::input::transaction::Transaction) -> ClientResult<Option<FeeEstimate>>{
         let mut url = self.urls.simulate_transaction.clone();
         url.query_pairs_mut().append_pair(BLOCK_NUMBER_QUERY, &block_number.to_string());
@@ -382,7 +418,6 @@ impl StarknetClientTrait for StarknetClient {
             },
             StatusCode::INTERNAL_SERVER_ERROR => {
                 let starknet_error: StarknetError = serde_json::from_str(&message)?;
-                println!("ERROR##: {:?}", starknet_error);
                 Err(ClientError::StarknetError(starknet_error))
             }
             _ => Err(ClientError::BadResponseStatus { code, message }),

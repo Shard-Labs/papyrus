@@ -31,6 +31,7 @@ use starknet_api::state::{StateNumber, StorageKey};
 use starknet_api::transaction::{
     EventIndexInTransactionOutput, TransactionHash, TransactionOffsetInBlock,
 };
+use starknet_client::objects::output::transaction::{AddTransactionResult, InvokeTransactionResult};
 use starknet_client::{StarknetClient, RetryConfig, StarknetClientTrait, ClientError, StarknetErrorCode};
 use tracing::{debug, error, info, instrument};
 
@@ -98,12 +99,12 @@ fn starknet_client_error(err: ClientError) -> Error{
                 StarknetErrorCode::EntryPointNotFound => Error::from(JsonRpcError::InvalidCalldata),
                 StarknetErrorCode::InvalidContractDefinition => Error::from(JsonRpcError::ContractNotFound),
                 StarknetErrorCode::UninitializedContract => Error::from(JsonRpcError::ContractError),
+                StarknetErrorCode::OutOfRangeClassHash => Error::from(JsonRpcError::ClassHashNotFound),
 
                 StarknetErrorCode::MalformedRequest |
                 StarknetErrorCode::DeprecatedTransaction | 
                 StarknetErrorCode::NotPermittedContract |
                 StarknetErrorCode::OutOfRangeBlockHash |
-                StarknetErrorCode::OutOfRangeClassHash |
                 StarknetErrorCode::OutOfRangeContractAddress |
                 StarknetErrorCode::OutOfRangeFee |
                 StarknetErrorCode::OutOfRangeTransactionHash |
@@ -562,12 +563,75 @@ impl JsonRpcServer for JsonRpcServerImpl {
         let res = match request {
             crate::transaction::input::Transaction::Deploy(_) => Option::Some(starknet_client::objects::output::transaction::FeeEstimate::default()),
             _ => self.starknet_source
-            .simulate_transaction(block_id.into(), request.into())
-            .await
-            .map_err(starknet_client_error)?
+                .simulate_transaction(block_id.into(), request.into())
+                .await
+                .map_err(starknet_client_error)?
         };
 
         return Result::Ok(crate::transaction::output::FeeEstimate::from(res.unwrap()));
+    }
+
+    #[instrument(skip(self), level = "debug", err, ret)]
+    async fn add_invoke_transaction(
+        &self, 
+        request: crate::transaction::input::InvokeTransaction
+    ) -> Result<TransactionHash, Error>{
+        let res = self.starknet_source
+            .add_transaction(starknet_client::objects::input::transaction::Transaction::Invoke(request.into()))
+            .await
+            .map_err(starknet_client_error)?;
+
+        let res = if let AddTransactionResult::Invoke(invoke) = res.unwrap(){
+            invoke
+        }else{
+            panic!("Unrecognised result")
+        };
+
+        return Result::Ok(res.common_fields.transaction_hash);
+    }
+
+    #[instrument(skip(self), level = "debug", err, ret)]
+    async fn add_declare_transaction(
+        &self, 
+        request: crate::transaction::input::DeclareTransaction
+    ) -> Result<crate::transaction::output::DeclareTransaction, Error>{
+        let res = self.starknet_source
+            .add_transaction(starknet_client::objects::input::transaction::Transaction::Declare(request.into()))
+            .await
+            .map_err(starknet_client_error)?;
+
+        let res = if let AddTransactionResult::Declare(declare) = res.unwrap(){
+            declare
+        }else{
+            panic!("Unrecognised result")
+        };
+
+        return Result::Ok(crate::transaction::output::DeclareTransaction{
+            transaction_hash: res.common_fields.transaction_hash,
+            class_hash: res.class_hash
+        });
+    }
+
+    #[instrument(skip(self), level = "debug", err, ret)]
+    async fn add_deploy_account_transaction(
+        &self, 
+        request: crate::transaction::input::DeployAccountTransaction
+    ) -> Result<crate::transaction::output::DeployAccountTransaction, Error>{
+        let res = self.starknet_source
+            .add_transaction(starknet_client::objects::input::transaction::Transaction::DeployAccount(request.into()))
+            .await
+            .map_err(starknet_client_error)?;
+
+        let res = if let AddTransactionResult::Deploy(deploy) = res.unwrap(){
+            deploy
+        }else{
+            panic!("Unrecognised result")
+        };
+
+        return Result::Ok(crate::transaction::output::DeployAccountTransaction{
+            transaction_hash: res.common_fields.transaction_hash,
+            contract_address: res.address
+        });
     }
 }
 

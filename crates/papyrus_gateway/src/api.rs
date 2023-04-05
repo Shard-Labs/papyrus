@@ -193,4 +193,16 @@ pub trait JsonRpc {
     async fn estimate_fee(&self,
         block_id: BlockId,
         request: crate::transaction::input::Transaction) -> Result<crate::transaction::output::FeeEstimate, Error>;
+
+    /// Returns hash of invoked transaction
+    #[method(name="addInvokeTransaction")]
+    async fn add_invoke_transaction(&self, request: crate::transaction::input::InvokeTransaction) -> Result<TransactionHash, Error>;
+
+    /// Returns hash of declare transaction
+    #[method(name="addDeclareTransaction")]
+    async fn add_declare_transaction(&self, request: crate::transaction::input::DeclareTransaction) -> Result<crate::transaction::output::DeclareTransaction, Error>;
+    
+    /// Returns hash of deploy account transaction
+    #[method(name="addDeployAccountTransaction")]
+    async fn add_deploy_account_transaction(&self, request:crate::transaction::input::DeployAccountTransaction) -> Result<crate::transaction::output::DeployAccountTransaction, Error>;
 }

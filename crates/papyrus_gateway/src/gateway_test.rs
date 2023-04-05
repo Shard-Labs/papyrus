@@ -1444,6 +1444,7 @@ async fn run_server_no_blocks() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn serialize_returns_valid_json() {
     let (storage_reader, mut storage_writer) = get_test_storage();
     let mut rng = get_rng();

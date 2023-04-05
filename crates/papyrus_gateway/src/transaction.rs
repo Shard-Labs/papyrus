@@ -402,7 +402,8 @@ pub mod input{
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
     pub struct ContractClass{
         pub abi: Option<Vec<ContractClassAbiEntryWithType>>,
-        pub program: Program,
+        /// base64 encoded compressed program code
+        pub program: String,
         pub entry_points_by_type: HashMap<EntryPointType, Vec<EntryPoint>>,
     }
 
@@ -564,28 +565,16 @@ pub mod input{
 
     impl Into<starknet_client::objects::input::transaction::ContractClass> for ContractClass{
         fn into(self) -> starknet_client::objects::input::transaction::ContractClass {
-            let program_value = serde_json::to_value(&self.program).unwrap();
-            let program_value = starknet_api::utils::traverse_and_exclude_top_level_keys(
-                &program_value, 
-                &|key, val|{
-                    return (key == "attributes" || key == "compiler_version") && val.is_null();
-            });
-
             let abi = if self.abi.is_none() {
                 vec![]
             } else {
                 self.abi.unwrap().into_iter().map(|entry| entry.into()).collect()
             };
 
-            let mut en = GzEncoder::new(Vec::new(), Compression::fast());
-            serde_json::to_writer(&mut en, &program_value).unwrap();
-            let gzip_compressed = en.finish().unwrap();
-            let encoded_json = base64::encode(&gzip_compressed);
-
             starknet_client::objects::input::transaction::ContractClass{
                 abi: Some(abi),
                 entry_points_by_type: self.entry_points_by_type,
-                program: encoded_json
+                program: self.program
             }
         }
     }
@@ -593,8 +582,7 @@ pub mod input{
 
 pub mod output{
     use serde::{Serialize, Deserialize};
-
-
+    use starknet_api::{hash::{StarkFelt}, transaction::TransactionHash};
     #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
     pub struct FeeEstimate {
         pub gas_consumed: u128,
@@ -611,5 +599,16 @@ pub mod output{
             }
         }
     }
-    
+
+    #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+    pub struct DeclareTransaction {
+        pub transaction_hash: TransactionHash,
+        pub class_hash: StarkFelt
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+    pub struct DeployAccountTransaction {
+        pub transaction_hash: TransactionHash,
+        pub contract_address: StarkFelt
+    }
 }
