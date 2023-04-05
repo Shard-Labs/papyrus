@@ -83,35 +83,55 @@ impl From<starknet_api::state::ContractClassAbiEntry> for ContractClassAbiEntryW
     }
 }
 
-impl Into<starknet_client::objects::state::ContractClassAbiEntry> for ContractClassAbiEntryWithType{
+impl Into<starknet_client::objects::state::ContractClassAbiEntry>
+    for ContractClassAbiEntryWithType
+{
     fn into(self) -> starknet_client::objects::state::ContractClassAbiEntry {
         match self.entry {
-            ContractClassAbiEntry::Event(entry) => starknet_client::objects::state::ContractClassAbiEntry::Event(entry),
-            ContractClassAbiEntry::Struct(entry) => starknet_client::objects::state::ContractClassAbiEntry::Struct(entry),
-            ContractClassAbiEntry::Function(entry) => {
-                match self.r#type {
-                    ContractClassAbiEntryType::Constructor => {
-                        starknet_client::objects::state::ContractClassAbiEntry::Function(FunctionAbiEntryWithType { 
-                            r#type: starknet_client::objects::state::FunctionAbiEntryType::Constructor, entry: entry, state_mutability: self.state_mutability 
-                        })
-                    },
-                    ContractClassAbiEntryType::Function => {
-                        starknet_client::objects::state::ContractClassAbiEntry::Function(FunctionAbiEntryWithType { 
-                            r#type: starknet_client::objects::state::FunctionAbiEntryType::Function, entry: entry, state_mutability: self.state_mutability 
-                        })
-                    },
-                    ContractClassAbiEntryType::L1Handler => {
-                        starknet_client::objects::state::ContractClassAbiEntry::Function(FunctionAbiEntryWithType { 
-                            r#type: starknet_client::objects::state::FunctionAbiEntryType::L1Handler, entry: entry, state_mutability: self.state_mutability 
-                        })
-                    },
-                    _ => {
-                        starknet_client::objects::state::ContractClassAbiEntry::Function(FunctionAbiEntryWithType { 
-                            r#type: starknet_client::objects::state::FunctionAbiEntryType::Function, entry: entry, state_mutability: self.state_mutability 
-                        })
-                    }
-                }
+            ContractClassAbiEntry::Event(entry) => {
+                starknet_client::objects::state::ContractClassAbiEntry::Event(entry)
             }
+            ContractClassAbiEntry::Struct(entry) => {
+                starknet_client::objects::state::ContractClassAbiEntry::Struct(entry)
+            }
+            ContractClassAbiEntry::Function(entry) => match self.r#type {
+                ContractClassAbiEntryType::Constructor => {
+                    starknet_client::objects::state::ContractClassAbiEntry::Function(
+                        FunctionAbiEntryWithType {
+                            r#type:
+                                starknet_client::objects::state::FunctionAbiEntryType::Constructor,
+                            entry,
+                            state_mutability: self.state_mutability,
+                        },
+                    )
+                }
+                ContractClassAbiEntryType::Function => {
+                    starknet_client::objects::state::ContractClassAbiEntry::Function(
+                        FunctionAbiEntryWithType {
+                            r#type: starknet_client::objects::state::FunctionAbiEntryType::Function,
+                            entry,
+                            state_mutability: self.state_mutability,
+                        },
+                    )
+                }
+                ContractClassAbiEntryType::L1Handler => {
+                    starknet_client::objects::state::ContractClassAbiEntry::Function(
+                        FunctionAbiEntryWithType {
+                            r#type:
+                                starknet_client::objects::state::FunctionAbiEntryType::L1Handler,
+                            entry,
+                            state_mutability: self.state_mutability,
+                        },
+                    )
+                }
+                _ => starknet_client::objects::state::ContractClassAbiEntry::Function(
+                    FunctionAbiEntryWithType {
+                        r#type: starknet_client::objects::state::FunctionAbiEntryType::Function,
+                        entry,
+                        state_mutability: self.state_mutability,
+                    },
+                ),
+            },
         }
     }
 }

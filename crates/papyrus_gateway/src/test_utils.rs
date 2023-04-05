@@ -1,14 +1,15 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 use jsonrpsee::http_server::RpcModule;
 use jsonschema::JSONSchema;
 use papyrus_storage::test_utils::get_test_storage;
 use papyrus_storage::StorageWriter;
+use reqwest::Client;
 use starknet_api::core::ChainId;
 use starknet_client::{RetryConfig, StarknetClient};
-use reqwest::Client;
 
-use crate::{GatewayConfig, JsonRpcServer, JsonRpcServerImpl, CentralSourceConfig};
+use crate::{CentralSourceConfig, GatewayConfig, JsonRpcServer, JsonRpcServerImpl};
 
 // TODO(anatg): See if this can be usefull for the benchmark testing as well.
 pub async fn send_request(address: SocketAddr, method: &str, params: &str) -> serde_json::Value {
@@ -35,11 +36,11 @@ pub fn get_test_gateway_config() -> GatewayConfig {
     }
 }
 
-pub fn get_test_starknet_source_config() -> CentralSourceConfig{
-    CentralSourceConfig{
+pub fn get_test_starknet_source_config() -> CentralSourceConfig {
+    CentralSourceConfig {
         url: String::from("http://127.0.0.1:1"),
         http_headers: Option::None,
-        retry_config: RetryConfig{
+        retry_config: RetryConfig {
             retry_base_millis: 0,
             retry_max_delay_millis: 0,
             max_retries: 0,
@@ -60,11 +61,12 @@ pub(crate) fn get_test_rpc_server_and_storage_writer()
             max_events_keys: config.max_events_keys,
             starknet_source: Arc::new(
                 StarknetClient::new(
-                    &starknet_source_config.url, 
-                    starknet_source_config.http_headers, 
-                    starknet_source_config.retry_config
-                ).unwrap()
-            )
+                    &starknet_source_config.url,
+                    starknet_source_config.http_headers,
+                    starknet_source_config.retry_config,
+                )
+                .unwrap(),
+            ),
         }
         .into_rpc(),
         storage_writer,

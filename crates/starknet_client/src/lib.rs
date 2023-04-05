@@ -14,7 +14,7 @@ use std::fmt::{self, Display, Formatter};
 use async_trait::async_trait;
 #[cfg(any(feature = "testing", test))]
 use mockall::automock;
-use objects::output::transaction::{FeeEstimate, AddTransactionResult};
+use objects::output::transaction::{AddTransactionResult, FeeEstimate};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -51,9 +51,17 @@ pub trait StarknetClientTrait {
     /// Returns a [`starknet_clinet`][`StateUpdate`] corresponding to `block_number`.
     async fn state_update(&self, block_number: BlockNumber) -> ClientResult<Option<StateUpdate>>;
     /// Returns a [`starknet_clinet`][`FeeEstimate`] corresponding to given `transaction`.
-    async fn simulate_transaction(&self, block_number: objects::input::block::BlockId, request: objects::input::transaction::Transaction) -> ClientResult<Option<FeeEstimate>>;
-    /// Returns a [`starknet_clinet`][`AddTransactionResukt`] containing information about transaction hash and class hash or contract address
-    async fn add_transaction(&self, request: objects::input::transaction::Transaction) -> ClientResult<Option<AddTransactionResult>>;
+    async fn simulate_transaction(
+        &self,
+        block_number: objects::input::block::BlockId,
+        request: objects::input::transaction::Transaction,
+    ) -> ClientResult<Option<FeeEstimate>>;
+    /// Returns a [`starknet_clinet`][`AddTransactionResukt`] containing information about
+    /// transaction hash and class hash or contract address
+    async fn add_transaction(
+        &self,
+        request: objects::input::transaction::Transaction,
+    ) -> ClientResult<Option<AddTransactionResult>>;
 }
 
 /// A starknet client.
@@ -360,10 +368,14 @@ impl StarknetClientTrait for StarknetClient {
         }
     }
 
-    async fn add_transaction(&self, request: objects::input::transaction::Transaction) -> ClientResult<Option<AddTransactionResult>>{
+    async fn add_transaction(
+        &self,
+        request: objects::input::transaction::Transaction,
+    ) -> ClientResult<Option<AddTransactionResult>> {
         let url = self.urls.add_transaction.clone();
 
-        let result = self.internal_client
+        let result = self
+            .internal_client
             .post(url)
             .headers(self.http_headers.clone())
             .json(&request)
@@ -377,12 +389,12 @@ impl StarknetClientTrait for StarknetClient {
                 (err.status().ok_or(err)?, msg)
             }
         };
-        
+
         match code {
             StatusCode::OK => {
                 let data: AddTransactionResult = serde_json::from_str(&message)?;
                 return Ok(Some(data));
-            },
+            }
             StatusCode::INTERNAL_SERVER_ERROR => {
                 let starknet_error: StarknetError = serde_json::from_str(&message)?;
                 Err(ClientError::StarknetError(starknet_error))
@@ -391,11 +403,16 @@ impl StarknetClientTrait for StarknetClient {
         }
     }
 
-    async fn simulate_transaction(&self, block_number: objects::input::block::BlockId, request: objects::input::transaction::Transaction) -> ClientResult<Option<FeeEstimate>>{
+    async fn simulate_transaction(
+        &self,
+        block_number: objects::input::block::BlockId,
+        request: objects::input::transaction::Transaction,
+    ) -> ClientResult<Option<FeeEstimate>> {
         let mut url = self.urls.simulate_transaction.clone();
         url.query_pairs_mut().append_pair(BLOCK_NUMBER_QUERY, &block_number.to_string());
 
-        let result = self.internal_client
+        let result = self
+            .internal_client
             .post(url)
             .headers(self.http_headers.clone())
             .json(&request)
@@ -409,13 +426,13 @@ impl StarknetClientTrait for StarknetClient {
                 (err.status().ok_or(err)?, msg)
             }
         };
-        
+
         match code {
             StatusCode::OK => {
                 let data: HashMap<String, serde_json::Value> = serde_json::from_str(&message)?;
                 let fee: FeeEstimate = serde_json::from_str(&data["fee_estimation"].to_string())?;
                 return Ok(Some(fee));
-            },
+            }
             StatusCode::INTERNAL_SERVER_ERROR => {
                 let starknet_error: StarknetError = serde_json::from_str(&message)?;
                 Err(ClientError::StarknetError(starknet_error))

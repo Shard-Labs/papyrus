@@ -31,8 +31,12 @@ use starknet_api::state::{StateNumber, StorageKey};
 use starknet_api::transaction::{
     EventIndexInTransactionOutput, TransactionHash, TransactionOffsetInBlock,
 };
-use starknet_client::objects::output::transaction::{AddTransactionResult, InvokeTransactionResult};
-use starknet_client::{StarknetClient, RetryConfig, StarknetClientTrait, ClientError, StarknetErrorCode};
+use starknet_client::objects::output::transaction::{
+    AddTransactionResult, InvokeTransactionResult,
+};
+use starknet_client::{
+    ClientError, RetryConfig, StarknetClient, StarknetClientTrait, StarknetErrorCode,
+};
 use tracing::{debug, error, info, instrument};
 
 use crate::api::{
@@ -57,7 +61,7 @@ pub struct GatewayConfig {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct CentralSourceConfig{
+pub struct CentralSourceConfig {
     pub url: String,
     pub http_headers: Option<HashMap<String, String>>,
     pub retry_config: RetryConfig,
@@ -87,34 +91,44 @@ fn internal_server_error(err: impl Display) -> Error {
     )))
 }
 
-fn starknet_client_error(err: ClientError) -> Error{
+fn starknet_client_error(err: ClientError) -> Error {
     match err {
         ClientError::StarknetError(e) => {
             return match e.code {
                 StarknetErrorCode::BlockNotFound => Error::from(JsonRpcError::BlockNotFound),
-                StarknetErrorCode::InvalidProgram |
-                StarknetErrorCode::InvalidTransactionNonce |
-                StarknetErrorCode::InvalidTransactionVersion |
-                StarknetErrorCode::UndeclaredClass |
-                StarknetErrorCode::EntryPointNotFound => Error::from(JsonRpcError::InvalidCalldata),
-                StarknetErrorCode::InvalidContractDefinition => Error::from(JsonRpcError::ContractNotFound),
-                StarknetErrorCode::UninitializedContract => Error::from(JsonRpcError::ContractError),
-                StarknetErrorCode::OutOfRangeClassHash => Error::from(JsonRpcError::ClassHashNotFound),
+                StarknetErrorCode::InvalidProgram
+                | StarknetErrorCode::InvalidTransactionNonce
+                | StarknetErrorCode::InvalidTransactionVersion
+                | StarknetErrorCode::UndeclaredClass
+                | StarknetErrorCode::EntryPointNotFound => {
+                    Error::from(JsonRpcError::InvalidCalldata)
+                }
+                StarknetErrorCode::InvalidContractDefinition => {
+                    Error::from(JsonRpcError::ContractNotFound)
+                }
+                StarknetErrorCode::UninitializedContract => {
+                    Error::from(JsonRpcError::ContractError)
+                }
+                StarknetErrorCode::OutOfRangeClassHash => {
+                    Error::from(JsonRpcError::ClassHashNotFound)
+                }
 
-                StarknetErrorCode::MalformedRequest |
-                StarknetErrorCode::DeprecatedTransaction | 
-                StarknetErrorCode::NotPermittedContract |
-                StarknetErrorCode::OutOfRangeBlockHash |
-                StarknetErrorCode::OutOfRangeContractAddress |
-                StarknetErrorCode::OutOfRangeFee |
-                StarknetErrorCode::OutOfRangeTransactionHash |
-                StarknetErrorCode::SchemaValidationError |
-                StarknetErrorCode::TransactionFailed |
-                StarknetErrorCode::TransactionLimitExceeded |
-                StarknetErrorCode::UnsupportedSelectorForFee => Error::from(JsonRpcError::FailedToReceiveTxn),
+                StarknetErrorCode::MalformedRequest
+                | StarknetErrorCode::DeprecatedTransaction
+                | StarknetErrorCode::NotPermittedContract
+                | StarknetErrorCode::OutOfRangeBlockHash
+                | StarknetErrorCode::OutOfRangeContractAddress
+                | StarknetErrorCode::OutOfRangeFee
+                | StarknetErrorCode::OutOfRangeTransactionHash
+                | StarknetErrorCode::SchemaValidationError
+                | StarknetErrorCode::TransactionFailed
+                | StarknetErrorCode::TransactionLimitExceeded
+                | StarknetErrorCode::UnsupportedSelectorForFee => {
+                    Error::from(JsonRpcError::FailedToReceiveTxn)
+                }
             };
-        },
-        _ => internal_server_error(err)
+        }
+        _ => internal_server_error(err),
     }
 }
 
@@ -555,17 +569,19 @@ impl JsonRpcServer for JsonRpcServerImpl {
 
     #[instrument(skip(self), level = "debug", err, ret)]
     async fn estimate_fee(
-        &self, 
-        block_id: BlockId, 
-        request: crate::transaction::input::Transaction
-    ) -> Result<crate::transaction::output::FeeEstimate, Error>{
-        
+        &self,
+        block_id: BlockId,
+        request: crate::transaction::input::Transaction,
+    ) -> Result<crate::transaction::output::FeeEstimate, Error> {
         let res = match request {
-            crate::transaction::input::Transaction::Deploy(_) => Option::Some(starknet_client::objects::output::transaction::FeeEstimate::default()),
-            _ => self.starknet_source
+            crate::transaction::input::Transaction::Deploy(_) => {
+                Option::Some(starknet_client::objects::output::transaction::FeeEstimate::default())
+            }
+            _ => self
+                .starknet_source
                 .simulate_transaction(block_id.into(), request.into())
                 .await
-                .map_err(starknet_client_error)?
+                .map_err(starknet_client_error)?,
         };
 
         return Result::Ok(crate::transaction::output::FeeEstimate::from(res.unwrap()));
@@ -573,17 +589,20 @@ impl JsonRpcServer for JsonRpcServerImpl {
 
     #[instrument(skip(self), level = "debug", err, ret)]
     async fn add_invoke_transaction(
-        &self, 
-        request: crate::transaction::input::InvokeTransaction
-    ) -> Result<TransactionHash, Error>{
-        let res = self.starknet_source
-            .add_transaction(starknet_client::objects::input::transaction::Transaction::Invoke(request.into()))
+        &self,
+        request: crate::transaction::input::InvokeTransaction,
+    ) -> Result<TransactionHash, Error> {
+        let res = self
+            .starknet_source
+            .add_transaction(starknet_client::objects::input::transaction::Transaction::Invoke(
+                request.into(),
+            ))
             .await
             .map_err(starknet_client_error)?;
 
-        let res = if let AddTransactionResult::Invoke(invoke) = res.unwrap(){
+        let res = if let AddTransactionResult::Invoke(invoke) = res.unwrap() {
             invoke
-        }else{
+        } else {
             panic!("Unrecognised result")
         };
 
@@ -592,45 +611,53 @@ impl JsonRpcServer for JsonRpcServerImpl {
 
     #[instrument(skip(self), level = "debug", err, ret)]
     async fn add_declare_transaction(
-        &self, 
-        request: crate::transaction::input::DeclareTransaction
-    ) -> Result<crate::transaction::output::DeclareTransaction, Error>{
-        let res = self.starknet_source
-            .add_transaction(starknet_client::objects::input::transaction::Transaction::Declare(request.into()))
+        &self,
+        request: crate::transaction::input::DeclareTransaction,
+    ) -> Result<crate::transaction::output::DeclareTransaction, Error> {
+        let res = self
+            .starknet_source
+            .add_transaction(starknet_client::objects::input::transaction::Transaction::Declare(
+                request.into(),
+            ))
             .await
             .map_err(starknet_client_error)?;
 
-        let res = if let AddTransactionResult::Declare(declare) = res.unwrap(){
+        let res = if let AddTransactionResult::Declare(declare) = res.unwrap() {
             declare
-        }else{
+        } else {
             panic!("Unrecognised result")
         };
 
-        return Result::Ok(crate::transaction::output::DeclareTransaction{
+        return Result::Ok(crate::transaction::output::DeclareTransaction {
             transaction_hash: res.common_fields.transaction_hash,
-            class_hash: res.class_hash
+            class_hash: res.class_hash,
         });
     }
 
     #[instrument(skip(self), level = "debug", err, ret)]
     async fn add_deploy_account_transaction(
-        &self, 
-        request: crate::transaction::input::DeployAccountTransaction
-    ) -> Result<crate::transaction::output::DeployAccountTransaction, Error>{
-        let res = self.starknet_source
-            .add_transaction(starknet_client::objects::input::transaction::Transaction::DeployAccount(request.into()))
+        &self,
+        request: crate::transaction::input::DeployAccountTransaction,
+    ) -> Result<crate::transaction::output::DeployAccountTransaction, Error> {
+        let res = self
+            .starknet_source
+            .add_transaction(
+                starknet_client::objects::input::transaction::Transaction::DeployAccount(
+                    request.into(),
+                ),
+            )
             .await
             .map_err(starknet_client_error)?;
 
-        let res = if let AddTransactionResult::Deploy(deploy) = res.unwrap(){
+        let res = if let AddTransactionResult::Deploy(deploy) = res.unwrap() {
             deploy
-        }else{
+        } else {
             panic!("Unrecognised result")
         };
 
-        return Result::Ok(crate::transaction::output::DeployAccountTransaction{
+        return Result::Ok(crate::transaction::output::DeployAccountTransaction {
             transaction_hash: res.common_fields.transaction_hash,
-            contract_address: res.address
+            contract_address: res.address,
         });
     }
 }
@@ -639,7 +666,7 @@ impl JsonRpcServer for JsonRpcServerImpl {
 pub async fn run_server(
     config: &GatewayConfig,
     storage_reader: StorageReader,
-    central_source: &CentralSourceConfig
+    central_source: &CentralSourceConfig,
 ) -> anyhow::Result<(SocketAddr, HttpServerHandle)> {
     debug!("Starting gateway.");
     let server = HttpServerBuilder::default().build(&config.server_address).await?;
@@ -650,7 +677,11 @@ pub async fn run_server(
             storage_reader,
             max_events_chunk_size: config.max_events_chunk_size,
             max_events_keys: config.max_events_keys,
-            starknet_source: Arc::new(StarknetClient::new(&central_source.url, central_source.http_headers.clone(), central_source.retry_config)?)
+            starknet_source: Arc::new(StarknetClient::new(
+                &central_source.url,
+                central_source.http_headers.clone(),
+                central_source.retry_config,
+            )?),
         }
         .into_rpc(),
     )?;

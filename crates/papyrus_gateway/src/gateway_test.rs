@@ -1,4 +1,4 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::ops::Index;
 use std::sync::Arc;
@@ -19,9 +19,10 @@ use papyrus_storage::{EventIndex, TransactionIndex};
 use starknet_api::block::{BlockHash, BlockHeader, BlockNumber, BlockStatus};
 use starknet_api::core::{ClassHash, ContractAddress, Nonce, PatriciaKey};
 use starknet_api::hash::{StarkFelt, StarkHash};
-use starknet_api::state::{StateDiff, Program};
+use starknet_api::state::{Program, StateDiff};
 use starknet_api::transaction::{
-    EventIndexInTransactionOutput, EventKey, Transaction, TransactionHash, TransactionOffsetInBlock, Calldata, Fee,
+    Calldata, EventIndexInTransactionOutput, EventKey, Fee, Transaction, TransactionHash,
+    TransactionOffsetInBlock,
 };
 use starknet_api::{patricia_key, stark_felt};
 use test_utils::{
@@ -36,7 +37,8 @@ use crate::api::{
 use crate::block::Block;
 use crate::state::{ContractClass, StateUpdate, ThinStateDiff};
 use crate::test_utils::{
-    get_starknet_spec_api_schema, get_test_gateway_config, get_test_rpc_server_and_storage_writer, get_test_starknet_source_config,
+    get_starknet_spec_api_schema, get_test_gateway_config, get_test_rpc_server_and_storage_writer,
+    get_test_starknet_source_config,
 };
 use crate::transaction::output::FeeEstimate;
 use crate::transaction::{
@@ -1433,7 +1435,8 @@ async fn run_server_no_blocks() {
     let (storage_reader, _) = get_test_storage();
     let gateway_config = get_test_gateway_config();
     let starknet_source_config = get_test_starknet_source_config();
-    let (addr, _handle) = run_server(&gateway_config, storage_reader, &starknet_source_config).await.unwrap();
+    let (addr, _handle) =
+        run_server(&gateway_config, storage_reader, &starknet_source_config).await.unwrap();
     let client = HttpClientBuilder::default().build(format!("http://{addr:?}")).unwrap();
     let err = client.block_number().await.unwrap_err();
     assert_matches!(err, Error::Call(CallError::Custom(err)) if err == ErrorObject::owned(
@@ -1479,7 +1482,8 @@ async fn serialize_returns_valid_json() {
 
     let gateway_config = get_test_gateway_config();
     let starknet_source_config = get_test_starknet_source_config();
-    let (server_address, _handle) = run_server(&gateway_config, storage_reader, &starknet_source_config).await.unwrap();
+    let (server_address, _handle) =
+        run_server(&gateway_config, storage_reader, &starknet_source_config).await.unwrap();
 
     let schema = get_starknet_spec_api_schema(&[
         "BLOCK_WITH_TXS",
@@ -1497,17 +1501,20 @@ async fn serialize_returns_valid_json() {
 }
 
 #[tokio::test]
-async fn estimate_fee_deploy_transaction(){
+async fn estimate_fee_deploy_transaction() {
     let (rpc_server, _) = get_test_rpc_server_and_storage_writer();
-    let input = crate::transaction::input::DeployTransaction { 
+    let input = crate::transaction::input::DeployTransaction {
         r#type: crate::transaction::TransactionType::Deploy,
         version: starknet_api::transaction::TransactionVersion(StarkFelt::from(0)),
         contract_class: serde_json::Value::Null,
         contract_address_salt: starknet_api::transaction::ContractAddressSalt(StarkHash::from(0)),
-        constructor_calldata: Calldata(Arc::new(Vec::<StarkFelt>::new()))
+        constructor_calldata: Calldata(Arc::new(Vec::<StarkFelt>::new())),
     };
 
-    let res = rpc_server.call::<_, FeeEstimate>("starknet_estimateFee", (BlockId::Tag(Tag::Pending), input) ).await.unwrap();
+    let res = rpc_server
+        .call::<_, FeeEstimate>("starknet_estimateFee", (BlockId::Tag(Tag::Pending), input))
+        .await
+        .unwrap();
     assert_eq!(res, FeeEstimate::default());
 }
 

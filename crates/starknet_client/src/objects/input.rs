@@ -1,11 +1,12 @@
-pub mod transaction{
+pub mod transaction {
     use std::collections::HashMap;
 
-    use serde::{Serialize, Deserialize};
-    use starknet_api::state::{EntryPointType, EntryPoint};
-    use starknet_api::transaction::{Fee, TransactionVersion, ContractAddressSalt};
-    use starknet_api::core::{Nonce, ClassHash, ContractAddress, EntryPointSelector};
-    use crate::objects::state::{ContractClassAbiEntry};
+    use serde::{Deserialize, Serialize};
+    use starknet_api::core::{ClassHash, ContractAddress, EntryPointSelector, Nonce};
+    use starknet_api::state::{EntryPoint, EntryPointType};
+    use starknet_api::transaction::{ContractAddressSalt, Fee, TransactionVersion};
+
+    use crate::objects::state::ContractClassAbiEntry;
     use crate::objects::transaction::TransactionType;
 
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
@@ -18,12 +19,12 @@ pub mod transaction{
     pub struct Calldata(Vec<StarkFeltAsDecimal>);
 
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
-    pub struct CommonTransactionFields{
+    pub struct CommonTransactionFields {
         pub r#type: TransactionType,
         pub max_fee: Fee,
         pub version: TransactionVersion,
         pub signature: TransactionSignature,
-        pub nonce: Nonce
+        pub nonce: Nonce,
     }
 
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
@@ -34,7 +35,7 @@ pub mod transaction{
         pub entry_points_by_type: HashMap<EntryPointType, Vec<EntryPoint>>,
     }
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
-    pub struct DeclareTransaction{
+    pub struct DeclareTransaction {
         #[serde(flatten)]
         pub common_fields: CommonTransactionFields,
         pub contract_class: ContractClass,
@@ -42,7 +43,7 @@ pub mod transaction{
     }
 
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
-    pub struct DeployAccountTransaction{
+    pub struct DeployAccountTransaction {
         #[serde(flatten)]
         pub common_fields: CommonTransactionFields,
         pub contract_address_salt: ContractAddressSalt,
@@ -51,84 +52,78 @@ pub mod transaction{
     }
 
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
-    pub struct DeployTransaction{
+    pub struct DeployTransaction {
         pub contract_class: ContractClass,
         pub r#type: TransactionType,
         pub version: TransactionVersion,
         pub contract_address_salt: ContractAddressSalt,
-        pub constructor_calldata: Calldata
+        pub constructor_calldata: Calldata,
     }
 
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
-    pub struct InvokeTransactionV0{
+    pub struct InvokeTransactionV0 {
         #[serde(flatten)]
         pub common_fields: CommonTransactionFields,
         pub contract_address: ContractAddress,
         pub entry_point_selector: EntryPointSelector,
-        pub calldata: Calldata
+        pub calldata: Calldata,
     }
 
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
-    pub struct InvokeTransactionV1{
+    pub struct InvokeTransactionV1 {
         #[serde(flatten)]
         pub common_fields: CommonTransactionFields,
         pub contract_address: ContractAddress,
-        pub calldata: Calldata
+        pub calldata: Calldata,
     }
 
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
     #[serde(untagged)]
-    pub enum InvokeTransaction{
+    pub enum InvokeTransaction {
         V0(InvokeTransactionV0),
-        V1(InvokeTransactionV1)
+        V1(InvokeTransactionV1),
     }
 
     #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Serialize)]
     #[serde(untagged)]
-    pub enum Transaction{
+    pub enum Transaction {
         Declare(DeclareTransaction),
         DeployAccount(DeployAccountTransaction),
-        Invoke(InvokeTransaction)
+        Invoke(InvokeTransaction),
     }
 
-    impl From<starknet_api::hash::StarkFelt> for StarkFeltAsDecimal{
+    impl From<starknet_api::hash::StarkFelt> for StarkFeltAsDecimal {
         fn from(felt: starknet_api::hash::StarkFelt) -> Self {
             Self(ethnum::U256::from_be_bytes(felt.bytes().try_into().expect("invalid length")))
         }
     }
 
-    impl From<starknet_api::transaction::Calldata> for Calldata{
+    impl From<starknet_api::transaction::Calldata> for Calldata {
         fn from(calldata: starknet_api::transaction::Calldata) -> Self {
-            Self(
-                calldata.0.iter()
-                .map(|d| StarkFeltAsDecimal::from(d.clone()))
-                .collect()
-            )
+            Self(calldata.0.iter().map(|d| StarkFeltAsDecimal::from(d.clone())).collect())
         }
     }
 
-    impl From<starknet_api::transaction::TransactionSignature> for TransactionSignature{
+    impl From<starknet_api::transaction::TransactionSignature> for TransactionSignature {
         fn from(signature: starknet_api::transaction::TransactionSignature) -> Self {
-            Self(
-                signature.0.iter()
-                .map(|s| StarkFeltAsDecimal::from(s.clone()))
-                .collect()
-            )
+            Self(signature.0.iter().map(|s| StarkFeltAsDecimal::from(s.clone())).collect())
         }
     }
 
-    impl Serialize for StarkFeltAsDecimal{
+    impl Serialize for StarkFeltAsDecimal {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: serde::Serializer {
+        where
+            S: serde::Serializer,
+        {
             serializer.serialize_str(&self.0.to_string())
         }
     }
 }
 
-pub mod block{
+pub mod block {
     use std::fmt::{self};
-    use starknet_api::block::{BlockNumber, BlockHash};
+
+    use starknet_api::block::{BlockHash, BlockNumber};
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     pub enum Tag {
@@ -150,29 +145,29 @@ pub mod block{
         Tag(Tag),
     }
 
-    impl fmt::Display for Tag{
+    impl fmt::Display for Tag {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
                 Tag::Latest => write!(f, "latest"),
-                Tag::Pending => write!(f, "pending")
+                Tag::Pending => write!(f, "pending"),
             }
         }
     }
 
-    impl fmt::Display for BlockHashOrNumber{
+    impl fmt::Display for BlockHashOrNumber {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
                 BlockHashOrNumber::Hash(hash) => write!(f, "{}", hash.0),
-                BlockHashOrNumber::Number(number) => write!(f, "{}", number.0)
+                BlockHashOrNumber::Number(number) => write!(f, "{}", number.0),
             }
         }
     }
 
-    impl fmt::Display for BlockId{
+    impl fmt::Display for BlockId {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            match self{
+            match self {
                 BlockId::Tag(t) => write!(f, "{}", t),
-                BlockId::HashOrNumber(h) => write!(f, "{}", h)
+                BlockId::HashOrNumber(h) => write!(f, "{}", h),
             }
         }
     }
