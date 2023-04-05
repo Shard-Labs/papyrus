@@ -371,11 +371,9 @@ pub struct Event {
 pub mod input {
     use std::collections::HashMap;
 
-    use flate2::write::GzEncoder;
-    use flate2::Compression;
     use serde::{Deserialize, Serialize};
     use starknet_api::core::{ClassHash, ContractAddress, EntryPointSelector, Nonce};
-    use starknet_api::state::{EntryPoint, EntryPointType, Program};
+    use starknet_api::state::{EntryPoint, EntryPointType};
     use starknet_api::transaction::{
         Calldata, ContractAddressSalt, Fee, TransactionSignature, TransactionVersion,
     };

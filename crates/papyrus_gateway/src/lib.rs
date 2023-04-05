@@ -31,9 +31,7 @@ use starknet_api::state::{StateNumber, StorageKey};
 use starknet_api::transaction::{
     EventIndexInTransactionOutput, TransactionHash, TransactionOffsetInBlock,
 };
-use starknet_client::objects::output::transaction::{
-    AddTransactionResult, InvokeTransactionResult,
-};
+use starknet_client::objects::output::transaction::AddTransactionResult;
 use starknet_client::{
     ClientError, RetryConfig, StarknetClient, StarknetClientTrait, StarknetErrorCode,
 };
